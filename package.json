@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate"
@@ -15,6 +16,7 @@
     "@prisma/client": "^5.19.0",
     "jose": "^5.6.3",
     "next": "14.2.14",
+    "prisma": "^5.19.0",
     "qrcode": "^1.5.4",
     "react": "^18",
     "react-dom": "^18"
@@ -26,7 +28,6 @@
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.20",
     "postcss": "^8",
-    "prisma": "^5.19.0",
     "tailwindcss": "^3.4.12",
     "typescript": "^5"
   }

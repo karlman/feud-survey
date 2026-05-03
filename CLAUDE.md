@@ -11,8 +11,8 @@ A Next.js web app for collecting Family Feud survey responses, with AI-powered t
 - Results export as JSON matching the Family Feud Pi app format
 
 ## Stack
-- **Next.js 14** with App Router and TypeScript
-- **Prisma** ORM with **PostgreSQL** (Azure Database for PostgreSQL in production)
+- **Next.js 14** with App Router, TypeScript, and `output: 'standalone'`
+- **Prisma** ORM with **SQLite** (file-based, no separate DB server)
 - **Tailwind CSS** for styling
 - **Anthropic SDK** for AI tabulation (`claude-opus-4-5`)
 - **jose** for JWT session management
@@ -20,19 +20,20 @@ A Next.js web app for collecting Family Feud survey responses, with AI-powered t
 
 ## Local development
 ```bash
-# 1. Start Postgres
-docker compose up -d
-
-# 2. Copy env file and fill in values
+# 1. Copy env file and fill in values
 cp .env.local.example .env.local
 
-# 3. Install deps and push schema
+# 2. Install deps
 npm install
-npm run db:push
+
+# 3. Create the local SQLite database and apply migrations
+npm run db:migrate   # creates prisma/dev.db
 
 # 4. Start dev server
 npm run dev
 ```
+
+The local SQLite file lives at `prisma/dev.db` (gitignored).
 
 ## Key routes
 - `/admin` — survey dashboard (requires auth)
@@ -72,11 +73,40 @@ Matches the format expected by the Family Feud Pi app:
 ```
 Points are scaled so the total across all answers ≈ 100.
 
-## Production (Azure)
-Deploy to Azure App Service (Node.js).
-Set env vars in App Service Configuration:
-- `DATABASE_URL` — Azure Database for PostgreSQL connection string
-- `ADMIN_PASSWORD`
-- `SESSION_SECRET` — long random string
-- `ANTHROPIC_API_KEY`
-- `NEXT_PUBLIC_APP_URL` — your Azure domain
+## Production (Azure App Service with containers)
+
+### How persistence works
+Azure App Service Linux mounts `/home` as persistent Azure Files storage
+(`WEBSITES_ENABLE_APP_SERVICE_STORAGE=true` by default). The SQLite database
+lives at `/home/data/feud.db` inside the container, so it survives restarts
+and redeployments. On first start, `startup.sh` creates `/home/data/` and
+runs `prisma migrate deploy` to initialise the schema.
+
+### Environment variables (set in App Service Configuration)
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | `file:/home/data/feud.db` |
+| `ADMIN_PASSWORD` | your admin password |
+| `SESSION_SECRET` | long random string |
+| `ANTHROPIC_API_KEY` | `sk-ant-...` |
+| `NEXT_PUBLIC_APP_URL` | `https://<your-app>.azurewebsites.net` |
+
+### Build and deploy
+```bash
+# Build the image (targets linux/amd64 regardless of build machine)
+docker build -t feud-survey .
+
+# Or cross-platform from ARM (Raspberry Pi):
+docker buildx build --platform linux/amd64 -t feud-survey .
+
+# Tag and push to Azure Container Registry
+docker tag feud-survey <acr-name>.azurecr.io/feud-survey:latest
+docker push <acr-name>.azurecr.io/feud-survey:latest
+```
+
+Then configure your App Service to pull from the ACR image and set the
+environment variables above.
+
+### Single-instance note
+SQLite does not support concurrent writes across multiple instances.
+Keep the App Service scaled to **one instance** (the default).

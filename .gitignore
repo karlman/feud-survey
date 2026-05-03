@@ -1,0 +1,7 @@
+.next/
+node_modules/
+.env.local
+.env
+prisma/migrations/
+*.js.map
+dist/

@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Survey {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  source      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lockedAt    DateTime?
+  token       String    @unique @default(cuid())
+  questions   Question[]
+  responses   Response[]
+}
+
+model Question {
+  id          String       @id @default(cuid())
+  surveyId    String
+  text        String
+  sortOrder   Int
+  survey      Survey       @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  answers     Answer[]
+  tabulations Tabulation[]
+
+  @@index([surveyId])
+}
+
+model Response {
+  id              String   @id @default(cuid())
+  surveyId        String
+  respondentToken String
+  submittedAt     DateTime @default(now())
+  survey          Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  answers         Answer[]
+
+  @@index([surveyId])
+}
+
+model Answer {
+  id         String   @id @default(cuid())
+  responseId String
+  questionId String
+  text       String
+  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+model Tabulation {
+  id           String   @id @default(cuid())
+  questionId   String
+  answerText   String
+  count        Int
+  qualityScore Float?
+  tabulatedAt  DateTime @default(now())
+  question     Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
